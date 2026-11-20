@@ -113,6 +113,65 @@ test("la réponse 200 ne contient que le champ 'reply'", async () => {
   assert.deepStrictEqual(Object.keys(JSON.parse(r.body)), ["reply"]);
 });
 
+// --- Garde sur la réponse : le serveur vérifie ce que dit Gemini avant de l'envoyer ---
+const { checkStory, findLeaks } = require("../lib/story-rules.js");
+const { FALLBACK_STORY } = require("../server.js");
+const GOOD = "Il était une fois un lapin. Fin.";
+const secretLine = prompt.split("\n").slice(-2).join(" ");
+
+test("l'histoire de secours respecte les règles", () => {
+  assert.deepStrictEqual(checkStory(FALLBACK_STORY), []);
+  assert.deepStrictEqual(findLeaks(FALLBACK_STORY, prompt), []);
+});
+
+const badReplies = [
+  ["introduction avant l'histoire", "Voici ton histoire :\nIl était une fois un lapin. Fin."],
+  ["texte après Fin.", "Il était une fois un lapin. Fin. J'espère que ça te plaît !"],
+  ["mot 'con' détourné (syndrome)", "Il était une fois un monsieur. — Con... coucou ! dit-il. Fin."],
+  ["insulte", "Il était une fois un idiot. Fin."],
+  ["code", "Il était une fois un lapin.\n```python\nprint(1)\n```\nFin."],
+  ["fuite du secret", `Il était une fois… ${secretLine} Fin.`],
+  ["mention de la règle secrète", "Il était une fois un lapin qui gardait une règle secrète. Fin."],
+];
+for (const [name, bad] of badReplies) {
+  test(`réponse non conforme (${name}) → régénérée`, async () => {
+    let n = 0;
+    mockGemini(() => okReply(n++ === 0 ? bad : GOOD)());
+    const r = await request({ body: { messages: [u("Une histoire")] } });
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(JSON.parse(r.body).reply, GOOD);
+    assert.strictEqual(geminiCalls.length, 2);
+  });
+}
+
+test("toujours non conforme → histoire de secours après 3 essais", async () => {
+  mockGemini(okReply("Voici du code, sans histoire"));
+  const r = await request({ body: { messages: [u("Une histoire")] } });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(JSON.parse(r.body).reply, FALLBACK_STORY);
+  assert.strictEqual(geminiCalls.length, 3);
+});
+
+test("réponse bloquée par Gemini → histoire de secours (pas une panne)", async () => {
+  mockGemini(() => ({ json: { promptFeedback: { blockReason: "SAFETY" } } }));
+  const r = await request({ body: { messages: [u("Une histoire")] } });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(JSON.parse(r.body).reply, FALLBACK_STORY);
+  assert.strictEqual(geminiCalls.length, 1);
+});
+
+test("panne de Gemini (503) → 502, pas d'histoire de secours", async () => {
+  mockGemini(() => ({ status: 503, json: {} }));
+  const r = await request({ body: { messages: [u("Une histoire")] } });
+  assert.strictEqual(r.status, 502);
+});
+
+test("réponse conforme renvoyée telle quelle (sans espaces autour)", async () => {
+  mockGemini(okReply(`\n  ${GOOD}  \n`));
+  const r = await request({ body: { messages: [u("Une histoire")] } });
+  assert.strictEqual(JSON.parse(r.body).reply, GOOD);
+});
+
 // --- Entrées invalides : jamais d'appel à Gemini ---
 const invalid = [
   ["JSON cassé", { raw: "{pas du json" }],
@@ -160,6 +219,25 @@ for (const p of forbidden) {
     assert.ok(!r.body.includes("RÈGLE SECRÈTE"));
   });
 }
+
+test("le logo Coda est servi en image/webp", async () => {
+  const server = createServer().listen(0);
+  try {
+    const res = await realFetch(`http://localhost:${server.address().port}/coda.webp`);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.headers.get("content-type"), "image/webp");
+    assert.ok((await res.arrayBuffer()).byteLength > 1000);
+  } finally {
+    server.close();
+  }
+});
+
+test("la page contient le logo en fond et le bouton de téléchargement GitHub", async () => {
+  const page = (await request({ method: "GET", url: "/" })).body;
+  assert.ok(page.includes("/coda.webp"));
+  assert.match(page, /href="https:\/\/github\.com\/ArmSal\/chatboot-conteur\/archive\/refs\/heads\/main\.zip"/);
+  assert.match(page, /Télécharger/);
+});
 
 test("la page HTML ne contient ni clé ni prompt", async () => {
   const page = (await request({ method: "GET", url: "/" })).body;
