@@ -35,7 +35,7 @@ async function askGemini(msgs, system, key, models) {
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
-        signal: AbortSignal.timeout(25000),
+        signal: AbortSignal.timeout(30000),
         headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         body: JSON.stringify({
           system_instruction: { parts: [{ text: system }] },
@@ -64,7 +64,8 @@ const MAX_ATTEMPTS = 3;
 async function safeReply(msgs, system, key, models) {
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     const r = await askGemini(msgs, system, key, models);
-    if (r === null) return null;
+    // Panne dès le 1er essai : vraie indisponibilité. Panne après une réponse refusée : histoire de secours.
+    if (r === null) return i === 0 ? null : FALLBACK_STORY;
     if (r.blocked) return FALLBACK_STORY;
     const text = r.text.trim();
     if (!checkStory(text).length && !findLeaks(text, system).length) return text;
@@ -134,148 +135,115 @@ const PAGE = `<!doctype html>
 <link rel="icon" href="/coda.webp" type="image/webp">
 <style>
   :root {
-    --bg: #f6f6fa; --surface: #ffffff; --border: #e2e0ec; --text: #1a1030; --muted: #5b5675;
-    --primary: #1a1030; --on-primary: #ffffff; --ring: #1a1030; --hover: #eeedf5;
-    --shadow: 0 1px 2px rgba(26, 16, 48, 0.06), 0 4px 16px rgba(26, 16, 48, 0.06);
+    --bg: #f7f4ff; --surface: #ffffff; --border: #e6e0f7; --text: #2d2a42; --muted: #6b6786;
+    --primary: #6c5ce7; --on-primary: #ffffff; --hover: #efeaff; --sun: #ffd166;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0e0a19; --surface: #181226; --border: #2e2745; --text: #f1eff8; --muted: #a8a1c0;
-      --primary: #d8f548; --on-primary: #1a1030; --ring: #d8f548; --hover: #221a38;
-      --shadow: none;
+      --bg: #14111f; --surface: #1e1a2e; --border: #332d4d; --text: #f0edfa; --muted: #aaa4c4;
+      --primary: #a99bff; --on-primary: #14111f; --hover: #2a2442;
     }
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  html { height: 100%; }
+  html, body { height: 100%; }
   body {
-    margin: 0; height: 100%; display: flex; flex-direction: column; background: var(--bg); color: var(--text);
-    font-family: Inter, "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; font-size: 16px; line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
+    margin: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; font-size: 16px; line-height: 1.5;
   }
-  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
   button, a { cursor: pointer; }
 
-  /* En-tête avec le logo dans le coin */
-  header {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 1.05rem; min-width: 0; }
+  .brand img { width: 40px; height: 40px; border-radius: 50%; display: block; flex: none; box-shadow: 0 0 0 1px var(--border); }
+  .brand span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .download {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; flex: none;
+    border-radius: 999px; border: 1.5px solid var(--primary); color: var(--primary); text-decoration: none; font-weight: 600; font-size: 0.9rem;
+    transition: background 0.15s ease;
   }
-  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-  .brand img { width: 40px; height: 40px; border-radius: 50%; flex: none; display: block; box-shadow: 0 0 0 1px var(--border); }
-  .brand strong { display: block; font-size: 1rem; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .brand small { display: block; font-size: 0.78rem; color: var(--muted); line-height: 1.2; }
-  .actions { display: flex; gap: 8px; flex: none; }
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; min-width: 44px; padding: 0 14px;
-    border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
-    font: inherit; font-size: 0.9rem; font-weight: 500; text-decoration: none; transition: background 0.15s ease, border-color 0.15s ease;
-  }
-  .btn:hover { background: var(--hover); border-color: var(--muted); }
-  .btn.primary { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
-  .btn.primary:hover { opacity: 0.9; }
-  .btn svg, .chip svg { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .download:hover { background: var(--hover); }
+  .download svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
   main { flex: 1; overflow-y: auto; }
-  .wrap { max-width: 780px; margin: 0 auto; padding: 0 20px 28px; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 20px 24px; }
 
-  /* Accueil */
-  #hello { padding-top: clamp(28px, 9vh, 80px); }
-  #hello h1 { margin: 0 0 8px; font-size: clamp(1.7rem, 5vw, 2.4rem); font-weight: 650; line-height: 1.15; letter-spacing: -0.02em; }
-  #hello p { margin: 0 0 28px; color: var(--muted); font-size: 1.05rem; max-width: 52ch; }
-  .chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  #hello { text-align: center; padding-top: clamp(32px, 12vh, 110px); }
+  #hello h1 { margin: 0 0 24px; font-size: clamp(1.8rem, 6vw, 2.6rem); line-height: 1.2; font-weight: 700; }
+  #hello h1 mark { color: inherit; background: linear-gradient(transparent 62%, var(--sun) 62%); padding: 0 4px; }
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
   .chip {
-    display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 14px 16px; text-align: left;
-    background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 14px;
-    font: inherit; font-size: 0.95rem; font-weight: 500; box-shadow: var(--shadow);
-    transition: border-color 0.15s ease, transform 0.15s ease;
+    min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); font: inherit; font-size: 0.95rem; transition: background 0.15s ease, border-color 0.15s ease;
   }
-  .chip:hover { border-color: var(--primary); transform: translateY(-1px); }
-  .chip .ico { flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--hover); display: grid; place-items: center; }
+  .chip:hover { background: var(--hover); border-color: var(--primary); }
 
-  /* Conversation */
-  .row { display: flex; gap: 12px; margin: 20px 0; }
+  .row { display: flex; margin: 18px 0; }
   .row.user { justify-content: flex-end; }
-  .row.user .text { background: var(--primary); color: var(--on-primary); padding: 11px 16px; border-radius: 18px 18px 4px 18px; max-width: 82%; }
-  .avatar { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; margin-top: 2px; }
-  .avatar svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .row.bot .text {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 4px 18px 18px 18px; padding: 16px 20px;
-    font-family: Charter, "Iowan Old Style", Georgia, "Times New Roman", serif; font-size: 1.1rem; line-height: 1.75; box-shadow: var(--shadow);
-    max-width: calc(100% - 44px);
-  }
-  .row.error .text { border-color: #c0392b; }
   .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .row.user .text { background: var(--primary); color: var(--on-primary); padding: 10px 18px; border-radius: 20px 20px 4px 20px; max-width: 85%; }
+  .row.bot .text {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 20px 20px 20px 4px; padding: 18px 22px;
+    font-family: Georgia, "Times New Roman", serif; font-size: 1.12rem; line-height: 1.75;
+  }
+  .row.error .text { border-color: #d64545; }
   .typing { display: inline-flex; gap: 5px; padding: 6px 0; }
-  .typing i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite; }
+  .typing i { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); animation: blink 1.2s infinite; }
   .typing i:nth-child(2) { animation-delay: 0.2s; }
   .typing i:nth-child(3) { animation-delay: 0.4s; }
   @keyframes blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
 
-  /* Saisie */
-  footer { padding: 8px 20px 14px; background: linear-gradient(to top, var(--bg) 70%, transparent); }
+  footer { padding: 8px 20px 16px; }
   form {
-    max-width: 780px; margin: 0 auto; display: flex; align-items: flex-end; gap: 8px; padding: 8px 8px 8px 18px;
-    background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow);
+    max-width: 720px; margin: 0 auto; display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 20px;
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 28px;
   }
-  form:focus-within { border-color: var(--ring); }
+  form:focus-within { border-color: var(--primary); }
   textarea {
     flex: 1; border: 0; outline: 0; resize: none; background: transparent; color: var(--text);
-    font: inherit; line-height: 1.5; padding: 10px 0; max-height: 160px; min-height: 44px;
+    font: inherit; line-height: 1.5; padding: 10px 0; max-height: 150px; min-height: 44px;
   }
   textarea::placeholder { color: var(--muted); }
   #send {
-    flex: none; width: 44px; height: 44px; border: 0; border-radius: 12px; background: var(--primary); color: var(--on-primary);
+    flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--primary); color: var(--on-primary);
     display: grid; place-items: center; transition: opacity 0.15s ease;
   }
-  #send:disabled { opacity: 0.3; cursor: default; }
-  #send svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .note { max-width: 780px; margin: 8px auto 0; display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 0.78rem; }
+  #send:disabled { opacity: 0.35; cursor: default; }
+  #send svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .note { max-width: 720px; margin: 8px auto 0; text-align: center; color: var(--muted); font-size: 0.78rem; }
 
-  @media (max-width: 560px) {
-    header { padding: 8px 12px; }
-    .btn .lbl { display: none; }
-    .btn { padding: 0; width: 44px; }
-    .brand small { display: none; }
+  @media (max-width: 520px) {
+    header { padding: 10px 14px; }
+    .download .lbl { display: none; }
+    .download { width: 44px; padding: 0; }
     .wrap { padding: 0 14px 20px; }
-    footer { padding: 6px 12px 10px; }
-    .row.user .text { max-width: 90%; }
+    footer { padding: 6px 12px 12px; }
     .row.bot .text { padding: 14px 16px; }
   }
-  @media (prefers-reduced-motion: reduce) {
-    * { animation: none !important; transition: none !important; }
-  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 <header>
   <div class="brand">
     <img src="/coda.webp" alt="Logo Coda" width="40" height="40">
-    <div>
-      <strong>Conteur d'histoires</strong>
-      <small>Pour les enfants de 6 à 9 ans</small>
-    </div>
+    <span>Conteur d'histoires</span>
   </div>
-  <div class="actions">
-    <button class="btn" id="reset" type="button" aria-label="Nouvelle histoire" hidden>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Nouvelle histoire</span>
-    </button>
-    <a class="btn primary" href="https://github.com/ArmSal/chatboot-conteur/archive/refs/heads/main.zip" target="_blank" rel="noopener" aria-label="Télécharger le projet">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg><span class="lbl">Télécharger le projet</span>
-    </a>
-  </div>
+  <a class="download" href="https://github.com/ArmSal/chatboot-conteur/archive/refs/heads/main.zip" target="_blank" rel="noopener" aria-label="Télécharger le projet">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg><span class="lbl">Télécharger le projet</span>
+  </a>
 </header>
 
 <main id="main">
   <div class="wrap">
     <section id="hello">
-      <h1>Quelle histoire veux-tu écouter&nbsp;?</h1>
-      <p>Choisis une idée ci-dessous ou décris ce que tu veux. Chaque histoire est courte, douce et pensée pour les enfants.</p>
+      <h1>Quelle <mark>histoire</mark> veux-tu écouter&nbsp;?</h1>
       <div class="chips">
-        <button class="chip" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg></span>Un dragon qui a peur du feu</button>
-        <button class="chip" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V6a2 2 0 012-2h13v14H6a2 2 0 00-2 2zM6 18h13"/></svg></span>Les 3 petits cochons</button>
-        <button class="chip" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/></svg></span>Un robot et un petit pirate</button>
-        <button class="chip" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></span>Une licorne qui cherche un ami</button>
+        <button class="chip" type="button">Un dragon qui a peur du feu</button>
+        <button class="chip" type="button">Les 3 petits cochons</button>
+        <button class="chip" type="button">Un robot et un petit pirate</button>
+        <button class="chip" type="button">Une licorne qui cherche un ami</button>
       </div>
     </section>
     <div id="log" role="log" aria-live="polite" aria-label="Conversation"></div>
@@ -289,36 +257,22 @@ const PAGE = `<!doctype html>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
     </button>
   </form>
-  <div class="note"><span>Le conteur peut se tromper.</span><span id="count" aria-hidden="true"></span></div>
+  <p class="note">Le conteur peut se tromper.</p>
 </footer>
 
 <script>
 const log = document.getElementById("log"), q = document.getElementById("q"), send = document.getElementById("send");
 const hello = document.getElementById("hello"), main = document.getElementById("main"), form = document.getElementById("f");
-const reset = document.getElementById("reset"), count = document.getElementById("count");
-const MAX = q.maxLength;
-let messages = [];
+const messages = [];
 let busy = false;
-const BOOK = '<span class="avatar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V6a2 2 0 012-2h13v14H6a2 2 0 00-2 2zM6 18h13"/></svg></span>';
 
 function scrollDown() { main.scrollTop = main.scrollHeight; }
-function addUser(text) {
+function addRow(cls, content) {
   const row = document.createElement("div");
-  row.className = "row user";
+  row.className = "row " + cls;
   const t = document.createElement("div");
   t.className = "text";
-  t.textContent = text;
-  row.appendChild(t);
-  log.appendChild(row);
-  scrollDown();
-}
-function addBot() {
-  const row = document.createElement("div");
-  row.className = "row bot";
-  row.innerHTML = BOOK;
-  const t = document.createElement("div");
-  t.className = "text";
-  t.innerHTML = '<span class="typing" aria-label="Le conteur écrit"><i></i><i></i><i></i></span>';
+  if (content) t.textContent = content;
   row.appendChild(t);
   log.appendChild(row);
   scrollDown();
@@ -328,17 +282,16 @@ function resize() {
   q.style.height = "auto";
   q.style.height = q.scrollHeight + "px";
   send.disabled = busy || !q.value.trim();
-  count.textContent = q.value.length > MAX * 0.8 ? q.value.length + " / " + MAX : "";
 }
 async function ask(text) {
   if (busy) return;
   busy = true;
   hello.hidden = true;
-  reset.hidden = false;
-  addUser(text);
+  addRow("user", text);
   messages.push({ role: "user", content: text });
-  const row = addBot();
-  const out = row.querySelector(".text");
+  const row = addRow("bot");
+  const out = row.firstChild;
+  out.innerHTML = '<span class="typing" aria-label="Le conteur écrit"><i></i><i></i><i></i></span>';
   resize();
   try {
     const r = await fetch("/chat", {
@@ -366,13 +319,6 @@ form.onsubmit = (e) => {
   if (!text) return;
   q.value = "";
   ask(text);
-};
-reset.onclick = () => {
-  messages = [];
-  log.textContent = "";
-  hello.hidden = false;
-  reset.hidden = true;
-  q.focus();
 };
 q.addEventListener("input", resize);
 q.addEventListener("keydown", (e) => {

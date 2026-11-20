@@ -160,6 +160,14 @@ test("réponse bloquée par Gemini → histoire de secours (pas une panne)", asy
   assert.strictEqual(geminiCalls.length, 1);
 });
 
+test("réponse refusée puis panne de Gemini au 2e essai → histoire de secours (pas 502)", async () => {
+  let n = 0;
+  mockGemini(() => (n++ === 0 ? okReply("Voici du code, sans histoire")() : { status: 503, json: {} }));
+  const r = await request({ body: { messages: [u("Une histoire")] } });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(JSON.parse(r.body).reply, FALLBACK_STORY);
+});
+
 test("panne de Gemini (503) → 502, pas d'histoire de secours", async () => {
   mockGemini(() => ({ status: 503, json: {} }));
   const r = await request({ body: { messages: [u("Une histoire")] } });
