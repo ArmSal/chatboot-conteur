@@ -128,116 +128,178 @@ const PAGE = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Un conteur d'histoires pour les enfants de 6 à 9 ans.">
+<meta name="color-scheme" content="light dark">
 <title>Conteur d'histoires</title>
+<link rel="icon" href="/coda.webp" type="image/webp">
 <style>
   :root {
-    --bg: #ffffff; --surface: #f0f4f9; --surface2: #e3e8ef; --text: #1f1f1f; --muted: #5f6368; --user: #e9eef6; --logo: 0.1;
+    --bg: #f6f6fa; --surface: #ffffff; --border: #e2e0ec; --text: #1a1030; --muted: #5b5675;
+    --primary: #1a1030; --on-primary: #ffffff; --ring: #1a1030; --hover: #eeedf5;
+    --shadow: 0 1px 2px rgba(26, 16, 48, 0.06), 0 4px 16px rgba(26, 16, 48, 0.06);
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #131314; --surface: #1e1f20; --surface2: #333537; --text: #e3e3e3; --muted: #9aa0a6; --user: #282a2c; --logo: 0.3; }
+    :root {
+      --bg: #0e0a19; --surface: #181226; --border: #2e2745; --text: #f1eff8; --muted: #a8a1c0;
+      --primary: #d8f548; --on-primary: #1a1030; --ring: #d8f548; --hover: #221a38;
+      --shadow: none;
+    }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { height: 100%; }
   body {
-    margin: 0; height: 100dvh; display: flex; flex-direction: column;
-    background: var(--bg); color: var(--text);
-    font-family: "Google Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+    margin: 0; height: 100%; display: flex; flex-direction: column; background: var(--bg); color: var(--text);
+    font-family: Inter, "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; font-size: 16px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
   }
-  /* Logo Coda en fond */
-  body::before {
-    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
-    background: url("/coda.webp") center / min(72vmin, 560px) no-repeat; opacity: var(--logo);
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  button, a { cursor: pointer; }
+
+  /* En-tête avec le logo dans le coin */
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
   }
-  header, main, footer { position: relative; z-index: 1; }
-  header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; }
-  .brand { font-size: 1.25rem; font-weight: 500; }
-  .download {
-    display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px;
-    background: var(--surface); color: var(--text); text-decoration: none; font-size: 0.9rem; font-weight: 500;
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand img { width: 40px; height: 40px; border-radius: 50%; flex: none; display: block; box-shadow: 0 0 0 1px var(--border); }
+  .brand strong { display: block; font-size: 1rem; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .brand small { display: block; font-size: 0.78rem; color: var(--muted); line-height: 1.2; }
+  .actions { display: flex; gap: 8px; flex: none; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; min-width: 44px; padding: 0 14px;
+    border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    font: inherit; font-size: 0.9rem; font-weight: 500; text-decoration: none; transition: background 0.15s ease, border-color 0.15s ease;
   }
-  .download:hover { background: var(--surface2); }
-  .download svg { width: 18px; height: 18px; fill: currentColor; }
-  @media (max-width: 520px) { .brand { font-size: 1.05rem; } .download .long { display: none; } .chip { max-width: none; flex: 1 1 140px; } }
+  .btn:hover { background: var(--hover); border-color: var(--muted); }
+  .btn.primary { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .btn.primary:hover { opacity: 0.9; }
+  .btn svg, .chip svg { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
   main { flex: 1; overflow-y: auto; }
-  .wrap { max-width: 760px; margin: 0 auto; padding: 0 20px 24px; }
-  #hello { padding-top: 12vh; }
-  #hello h1 { margin: 0; font-size: clamp(2rem, 6vw, 3.4rem); font-weight: 500; line-height: 1.15; }
-  #hello h1 span { background: linear-gradient(90deg, #4285f4, #9b72cb, #d96570); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  #hello h2 { margin: 4px 0 28px; font-size: clamp(1.6rem, 5vw, 3rem); font-weight: 500; color: var(--muted); }
-  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 0 20px 28px; }
+
+  /* Accueil */
+  #hello { padding-top: clamp(28px, 9vh, 80px); }
+  #hello h1 { margin: 0 0 8px; font-size: clamp(1.7rem, 5vw, 2.4rem); font-weight: 650; line-height: 1.15; letter-spacing: -0.02em; }
+  #hello p { margin: 0 0 28px; color: var(--muted); font-size: 1.05rem; max-width: 52ch; }
+  .chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
   .chip {
-    border: 0; cursor: pointer; background: var(--surface); color: var(--text); font: inherit; font-size: 0.95rem;
-    padding: 14px 18px; border-radius: 16px; text-align: left; max-width: 220px;
+    display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 14px 16px; text-align: left;
+    background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 14px;
+    font: inherit; font-size: 0.95rem; font-weight: 500; box-shadow: var(--shadow);
+    transition: border-color 0.15s ease, transform 0.15s ease;
   }
-  .chip:hover { background: var(--surface2); }
-  .row { display: flex; gap: 14px; margin: 22px 0; }
+  .chip:hover { border-color: var(--primary); transform: translateY(-1px); }
+  .chip .ico { flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--hover); display: grid; place-items: center; }
+
+  /* Conversation */
+  .row { display: flex; gap: 12px; margin: 20px 0; }
   .row.user { justify-content: flex-end; }
-  .row.user .text { background: var(--user); padding: 12px 18px; border-radius: 20px; max-width: 80%; }
-  .row.bot .spark { flex: none; width: 28px; height: 28px; margin-top: 2px; }
-  .text { white-space: pre-wrap; line-height: 1.65; font-size: 1rem; overflow-wrap: anywhere; }
-  .typing { display: inline-flex; gap: 5px; padding-top: 8px; }
+  .row.user .text { background: var(--primary); color: var(--on-primary); padding: 11px 16px; border-radius: 18px 18px 4px 18px; max-width: 82%; }
+  .avatar { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; margin-top: 2px; }
+  .avatar svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .row.bot .text {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 4px 18px 18px 18px; padding: 16px 20px;
+    font-family: Charter, "Iowan Old Style", Georgia, "Times New Roman", serif; font-size: 1.1rem; line-height: 1.75; box-shadow: var(--shadow);
+    max-width: calc(100% - 44px);
+  }
+  .row.error .text { border-color: #c0392b; }
+  .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .typing { display: inline-flex; gap: 5px; padding: 6px 0; }
   .typing i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite; }
   .typing i:nth-child(2) { animation-delay: 0.2s; }
   .typing i:nth-child(3) { animation-delay: 0.4s; }
   @keyframes blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
-  footer { padding: 0 20px 14px; }
+
+  /* Saisie */
+  footer { padding: 8px 20px 14px; background: linear-gradient(to top, var(--bg) 70%, transparent); }
   form {
-    max-width: 760px; margin: 0 auto; display: flex; align-items: flex-end; gap: 8px;
-    background: var(--surface); border-radius: 28px; padding: 8px 8px 8px 22px;
+    max-width: 780px; margin: 0 auto; display: flex; align-items: flex-end; gap: 8px; padding: 8px 8px 8px 18px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow);
   }
+  form:focus-within { border-color: var(--ring); }
   textarea {
     flex: 1; border: 0; outline: 0; resize: none; background: transparent; color: var(--text);
-    font: inherit; font-size: 1rem; line-height: 1.5; padding: 10px 0; max-height: 160px;
+    font: inherit; line-height: 1.5; padding: 10px 0; max-height: 160px; min-height: 44px;
   }
   textarea::placeholder { color: var(--muted); }
   #send {
-    flex: none; width: 42px; height: 42px; border: 0; border-radius: 50%; cursor: pointer;
-    background: var(--text); color: var(--bg); display: grid; place-items: center;
+    flex: none; width: 44px; height: 44px; border: 0; border-radius: 12px; background: var(--primary); color: var(--on-primary);
+    display: grid; place-items: center; transition: opacity 0.15s ease;
   }
-  #send:disabled { opacity: 0.25; cursor: default; }
-  #send svg { width: 22px; height: 22px; fill: currentColor; }
-  .note { text-align: center; color: var(--muted); font-size: 0.75rem; margin: 10px 0 0; }
+  #send:disabled { opacity: 0.3; cursor: default; }
+  #send svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .note { max-width: 780px; margin: 8px auto 0; display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 0.78rem; }
+
+  @media (max-width: 560px) {
+    header { padding: 8px 12px; }
+    .btn .lbl { display: none; }
+    .btn { padding: 0; width: 44px; }
+    .brand small { display: none; }
+    .wrap { padding: 0 14px 20px; }
+    footer { padding: 6px 12px 10px; }
+    .row.user .text { max-width: 90%; }
+    .row.bot .text { padding: 14px 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <span class="brand">Conteur d'histoires</span>
-  <a class="download" href="https://github.com/ArmSal/chatboot-conteur/archive/refs/heads/main.zip" target="_blank" rel="noopener">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg>
-    <span>Télécharger<span class="long"> le projet</span></span>
-  </a>
+  <div class="brand">
+    <img src="/coda.webp" alt="Logo Coda" width="40" height="40">
+    <div>
+      <strong>Conteur d'histoires</strong>
+      <small>Pour les enfants de 6 à 9 ans</small>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn" id="reset" type="button" aria-label="Nouvelle histoire" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Nouvelle histoire</span>
+    </button>
+    <a class="btn primary" href="https://github.com/ArmSal/chatboot-conteur/archive/refs/heads/main.zip" target="_blank" rel="noopener" aria-label="Télécharger le projet">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg><span class="lbl">Télécharger le projet</span>
+    </a>
+  </div>
 </header>
 
 <main id="main">
   <div class="wrap">
-    <div id="hello">
-      <h1><span>Bonjour !</span></h1>
-      <h2>Quelle histoire veux-tu écouter ?</h2>
+    <section id="hello">
+      <h1>Quelle histoire veux-tu écouter&nbsp;?</h1>
+      <p>Choisis une idée ci-dessous ou décris ce que tu veux. Chaque histoire est courte, douce et pensée pour les enfants.</p>
       <div class="chips">
-        <button class="chip" type="button">Un dragon qui a peur du feu</button>
-        <button class="chip" type="button">Les 3 petits cochons</button>
-        <button class="chip" type="button">Un robot et un petit pirate</button>
-        <button class="chip" type="button">Une licorne qui cherche un ami</button>
+        <button class="chip" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg></span>Un dragon qui a peur du feu</button>
+        <button class="chip" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V6a2 2 0 012-2h13v14H6a2 2 0 00-2 2zM6 18h13"/></svg></span>Les 3 petits cochons</button>
+        <button class="chip" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/></svg></span>Un robot et un petit pirate</button>
+        <button class="chip" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></span>Une licorne qui cherche un ami</button>
       </div>
-    </div>
-    <div id="log"></div>
+    </section>
+    <div id="log" role="log" aria-live="polite" aria-label="Conversation"></div>
   </div>
 </main>
 
 <footer>
   <form id="f">
-    <textarea id="q" rows="1" placeholder="Demande une histoire…" maxlength="${MAX_CHARS}" autocomplete="off"></textarea>
+    <textarea id="q" rows="1" aria-label="Ta demande d'histoire" placeholder="Décris l'histoire que tu veux…" maxlength="${MAX_CHARS}" autocomplete="off"></textarea>
     <button id="send" type="submit" disabled aria-label="Envoyer">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l-1.4 1.4 5.6 5.6H4v2h12.2l-5.6 5.6L12 20l8-8z" transform="rotate(-90 12 12)"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
     </button>
   </form>
-  <p class="note">Le conteur peut se tromper. Les histoires sont faites pour les enfants de 6 à 9 ans.</p>
+  <div class="note"><span>Le conteur peut se tromper.</span><span id="count" aria-hidden="true"></span></div>
 </footer>
 
 <script>
 const log = document.getElementById("log"), q = document.getElementById("q"), send = document.getElementById("send");
 const hello = document.getElementById("hello"), main = document.getElementById("main"), form = document.getElementById("f");
-const messages = [];
-const SPARK = '<svg class="spark" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4285f4"/><stop offset="0.55" stop-color="#9b72cb"/><stop offset="1" stop-color="#d96570"/></linearGradient></defs><path fill="url(#g)" d="M12 1c.6 5.8 5.2 10.4 11 11-5.8.6-10.4 5.2-11 11-.6-5.8-5.2-10.4-11-11 5.8-.6 10.4-5.2 11-11z"/></svg>';
+const reset = document.getElementById("reset"), count = document.getElementById("count");
+const MAX = q.maxLength;
+let messages = [];
+let busy = false;
+const BOOK = '<span class="avatar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V6a2 2 0 012-2h13v14H6a2 2 0 00-2 2zM6 18h13"/></svg></span>';
 
 function scrollDown() { main.scrollTop = main.scrollHeight; }
 function addUser(text) {
@@ -253,26 +315,31 @@ function addUser(text) {
 function addBot() {
   const row = document.createElement("div");
   row.className = "row bot";
-  row.innerHTML = SPARK;
+  row.innerHTML = BOOK;
   const t = document.createElement("div");
   t.className = "text";
-  t.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+  t.innerHTML = '<span class="typing" aria-label="Le conteur écrit"><i></i><i></i><i></i></span>';
   row.appendChild(t);
   log.appendChild(row);
   scrollDown();
-  return t;
+  return row;
 }
 function resize() {
   q.style.height = "auto";
   q.style.height = q.scrollHeight + "px";
-  send.disabled = !q.value.trim();
+  send.disabled = busy || !q.value.trim();
+  count.textContent = q.value.length > MAX * 0.8 ? q.value.length + " / " + MAX : "";
 }
 async function ask(text) {
-  hello.style.display = "none";
+  if (busy) return;
+  busy = true;
+  hello.hidden = true;
+  reset.hidden = false;
   addUser(text);
   messages.push({ role: "user", content: text });
-  const out = addBot();
-  send.disabled = true;
+  const row = addBot();
+  const out = row.querySelector(".text");
+  resize();
   try {
     const r = await fetch("/chat", {
       method: "POST",
@@ -285,8 +352,10 @@ async function ask(text) {
     out.textContent = data.reply;
   } catch (err) {
     messages.pop();
+    row.classList.add("error");
     out.textContent = "Oups : " + err.message;
   }
+  busy = false;
   scrollDown();
   resize();
   q.focus();
@@ -296,14 +365,20 @@ form.onsubmit = (e) => {
   const text = q.value.trim();
   if (!text) return;
   q.value = "";
-  resize();
   ask(text);
+};
+reset.onclick = () => {
+  messages = [];
+  log.textContent = "";
+  hello.hidden = false;
+  reset.hidden = true;
+  q.focus();
 };
 q.addEventListener("input", resize);
 q.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
 });
-document.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => ask(c.textContent)));
+document.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => ask(c.textContent.trim())));
 </script>
 </body>
 </html>`;
